@@ -105,17 +105,30 @@ bool QueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
     return true;
   }
 
-  auto query = createQuery(browser, frame, parsedRequest);
+  auto query = CreateQuery(browser, frame, parsedRequest);
 
   if (!query)
     return false;
 
-  CefPostTask(TID_FILE, base::Bind(&Query::execute, query, callback));
+  CefPostTask(TID_FILE, base::Bind(&QueryHandler::ExecuteQuery, base::Unretained(this), query_id, query, callback));
 
   return true;
 }
 
-CefRefPtr<Query> QueryHandler::createQuery(CefRefPtr<CefBrowser> browser,
+void QueryHandler::OnQueryCanceled(CefRefPtr<CefBrowser> browser,
+                                   CefRefPtr<CefFrame> frame,
+                                   int64 query_id) {
+  std::lock_guard<std::mutex> guard(mutex_);
+  BOOST_LOG_TRIVIAL(info) << "Received query cancellation request for query ID " << query_id;
+
+  auto queryPair = executingQueries.find(query_id);
+
+  if (queryPair != end(executingQueries)) {
+    queryPair->second->cancel();
+  }
+}
+
+CefRefPtr<Query> QueryHandler::CreateQuery(CefRefPtr<CefBrowser> browser,
                                            CefRefPtr<CefFrame> frame,
                                            const YAML::Node& request) {
   const string name = request["name"].as<string>();
@@ -176,5 +189,17 @@ CefRefPtr<Query> QueryHandler::createQuery(CefRefPtr<CefBrowser> browser,
     return new UpdateMasterlistQuery(lootState_);
 
   return nullptr;
+}
+
+void QueryHandler::ExecuteQuery(int64 query_id,
+                                CefRefPtr<Query> query,
+                                CefRefPtr<Callback> callback) {
+  std::lock_guard<std::mutex> guard(mutex_);
+
+  executingQueries.emplace(query_id, query);
+
+  query->execute(callback);
+
+  executingQueries.erase(query_id);
 }
 }

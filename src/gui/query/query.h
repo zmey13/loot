@@ -25,6 +25,8 @@ along with LOOT.  If not, see
 #ifndef LOOT_GUI_QUERY_QUERY
 #define LOOT_GUI_QUERY_QUERY
 
+#include <mutex>
+
 #include <boost/locale.hpp>
 #include <boost/log/trivial.hpp>
 #include <include/wrapper/cef_message_router.h>
@@ -32,13 +34,34 @@ along with LOOT.  If not, see
 namespace loot {
 class Query : public CefBase {
 public:
+  Query() : cancelled_(false) {}
+
   void execute(CefRefPtr<CefMessageRouterBrowserSide::Callback> callback) {
     try {
+      const std::string response = executeLogic();
+
+      if (isCancelled()) {
+        BOOST_LOG_TRIVIAL(info) << "Query cancelled.";
+        return;
+      }
+
       callback->Success(executeLogic());
     } catch (std::exception &e) {
       BOOST_LOG_TRIVIAL(error) << e.what();
       callback->Failure(-1, boost::locale::translate("Oh no, something went wrong! You can check your LOOTDebugLog.txt (you can get to it through the main menu) for more information.").str());
     }
+  }
+
+  void cancel() {
+    std::lock_guard<std::mutex> guard(mutex_);
+
+    cancelled_ = true;
+  }
+
+  bool isCancelled() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+
+    return cancelled_;
   }
 
 protected:
@@ -50,6 +73,9 @@ protected:
   }
 
 private:
+  bool cancelled_;
+  mutable std::mutex mutex_;
+
   IMPLEMENT_REFCOUNTING(Query);
 };
 }

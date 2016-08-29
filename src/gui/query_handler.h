@@ -46,12 +46,22 @@ public:
                        const CefString& request,
                        bool persistent,
                        CefRefPtr<Callback> callback) OVERRIDE;
+
+  virtual void OnQueryCanceled(CefRefPtr<CefBrowser> browser,
+                               CefRefPtr<CefFrame> frame,
+                               int64 query_id) OVERRIDE;
 private:
-  CefRefPtr<Query> createQuery(CefRefPtr<CefBrowser> browser,
+  CefRefPtr<Query> CreateQuery(CefRefPtr<CefBrowser> browser,
                                CefRefPtr<CefFrame> frame,
                                const YAML::Node& request);
 
+  void ExecuteQuery(int64 query_id,
+                    CefRefPtr<Query> query,
+                    CefRefPtr<Callback> callback);
+
   LootState& lootState_;
+  std::unordered_map<int64, CefRefPtr<Query>> executingQueries;
+  std::mutex mutex_;
 };
 }
 

@@ -72,12 +72,22 @@ jobs:
             libxtst-dev \
             libicu-dev
 
+      - name: Download libloot snapshot build artifact
+        run: |
+          curl -sSfL \
+            -H 'authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' \
+            -H 'Accept: application/vnd.github.v3+json' \
+            -o 'libloot.tar.xz.zip' \
+            https://api.github.com/repos/loot/libloot/actions/artifacts/39474101/zip
+          unzip libloot.tar.xz.zip
+          echo "LIBLOOT_URL=$PWD/$(ls -1 libloot-*.tar.xz)" >> $GITHUB_ENV
+
       - name: Run CMake
         run: |
           mkdir build
           cd build
           export CXX="g++-8" CC="gcc-8"
-          cmake .. -DBOOST_ROOT="$BOOST_ROOT_1_72_0"
+          cmake .. -DBOOST_ROOT="$BOOST_ROOT_1_72_0" -DLIBLOOT_URL="$LIBLOOT_URL"
           make all
 
       - name: Run C++ tests
